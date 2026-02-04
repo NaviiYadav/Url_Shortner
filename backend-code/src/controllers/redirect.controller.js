@@ -1,4 +1,5 @@
 import UAParser from 'ua-parser-js';
+import geoip from 'geoip-lite';
 import Url from '../models/Url.model.js';
 import Click from '../models/Click.model.js';
 
@@ -18,8 +19,10 @@ export const redirectToOriginal = async (req, res, next) => {
       return res.status(410).json({ error: 'This link has expired' });
     }
 
-    // Record click directly to database (async, don't wait)
-    recordClick(url, req).catch(err => console.error('Click recording error:', err));
+    // Record click (async)
+    recordClick(url, req).catch(err =>
+      console.error('Click recording error:', err)
+    );
 
     // Redirect immediately
     res.redirect(301, url.originalUrl);
@@ -28,38 +31,44 @@ export const redirectToOriginal = async (req, res, next) => {
   }
 };
 
-// Async function to record click analytics directly to database
+// Async function to record click analytics
 async function recordClick(url, req) {
   try {
     // Parse user agent
     const parser = new UAParser(req.headers['user-agent']);
     const uaResult = parser.getResult();
 
-    // Determine device type
+    // Device
     let device = 'desktop';
     if (uaResult.device.type === 'mobile') device = 'mobile';
     else if (uaResult.device.type === 'tablet') device = 'tablet';
 
-    // Get client IP (considering proxies)
-    const ip = req.headers['x-forwarded-for']?.split(',')[0]?.trim() || 
-               req.headers['x-real-ip'] || 
-               req.connection.remoteAddress;
+    // Client IP
+    const ip =
+      req.headers['x-forwarded-for']?.split(',')[0]?.trim() ||
+      req.headers['x-real-ip'] ||
+      req.connection.remoteAddress;
 
-    // Create click record directly in database
-    const click = new Click({
+    // GeoIP lookup
+    const geo = geoip.lookup(ip);
+    const country = geo?.country || null;
+    const city = geo?.city || null;
+
+    // Save click
+    await Click.create({
       urlId: url._id,
       userId: url.userId,
       referrer: req.headers.referer || null,
       userAgent: req.headers['user-agent'] || null,
-      ip: ip,
-      device: device,
+      ip,
+      country,
+      city,
+      device,
       browser: uaResult.browser.name || null,
       os: uaResult.os.name || null,
     });
 
-    await click.save();
-
-    // Update click count in URL document
+    // Update click count
     await Url.findByIdAndUpdate(url._id, { $inc: { clicks: 1 } });
   } catch (error) {
     console.error('Error recording click:', error);

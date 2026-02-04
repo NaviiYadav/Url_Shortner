@@ -12,6 +12,7 @@ import qrcodeRoutes from './routes/qrcode.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import redirectRoutes from './routes/redirect.routes.js';
 import { errorHandler } from './middleware/error.middleware.js';
+import analyticsRoutes from "./routes/analytics.routes.js";
 
 dotenv.config();
 
@@ -44,7 +45,9 @@ app.use('/api/otp', otpRoutes);
 app.use('/api/urls', urlRoutes);
 app.use('/api/qrcodes', qrcodeRoutes);
 app.use('/api/admin', adminRoutes);
-app.use('/', redirectRoutes); // Short URL redirects
+app.use("/api/analytics", analyticsRoutes);
+app.use('/', redirectRoutes); 
+
 
 // Health check
 app.get('/api/health', (req, res) => {

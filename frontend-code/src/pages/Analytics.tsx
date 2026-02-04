@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Globe, Smartphone, Monitor, Chrome, ArrowUp, ArrowDown } from 'lucide-react';
 import AnalyticsChart from '@/components/dashboard/AnalyticsChart';
@@ -11,48 +11,94 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-
-// Mock data
-const weeklyData: ChartDataPoint[] = [
-  { date: 'Mon', clicks: 120 },
-  { date: 'Tue', clicks: 180 },
-  { date: 'Wed', clicks: 150 },
-  { date: 'Thu', clicks: 220 },
-  { date: 'Fri', clicks: 310 },
-  { date: 'Sat', clicks: 280 },
-  { date: 'Sun', clicks: 190 },
-];
-
-const monthlyData: ChartDataPoint[] = [
-  { date: 'Week 1', clicks: 1200 },
-  { date: 'Week 2', clicks: 1800 },
-  { date: 'Week 3', clicks: 1500 },
-  { date: 'Week 4', clicks: 2200 },
-];
-
-const deviceData = [
-  { date: 'Mobile', clicks: 45 },
-  { date: 'Desktop', clicks: 40 },
-  { date: 'Tablet', clicks: 15 },
-];
-
-const browserData = [
-  { date: 'Chrome', clicks: 55 },
-  { date: 'Safari', clicks: 25 },
-  { date: 'Firefox', clicks: 12 },
-  { date: 'Edge', clicks: 8 },
-];
-
-const countryData = [
-  { country: 'United States', clicks: 4523, percentage: 35.2 },
-  { country: 'United Kingdom', clicks: 2341, percentage: 18.2 },
-  { country: 'Germany', clicks: 1876, percentage: 14.6 },
-  { country: 'France', clicks: 1234, percentage: 9.6 },
-  { country: 'Canada', clicks: 987, percentage: 7.7 },
-];
+import { useAuth } from '@/contexts/AuthContext';
 
 const Analytics: React.FC = () => {
+  const { user } = useAuth();
   const [timeRange, setTimeRange] = useState('7d');
+
+  const [weeklyData, setWeeklyData] = useState<ChartDataPoint[]>([]);
+  const [monthlyData, setMonthlyData] = useState<ChartDataPoint[]>([]);
+  const [deviceData, setDeviceData] = useState<ChartDataPoint[]>([]);
+  const [browserData, setBrowserData] = useState<ChartDataPoint[]>([]);
+  const [countryData, setCountryData] = useState<any[]>([]);
+  const [referrerData, setReferrerData] = useState<any[]>([]);
+
+  const [stats, setStats] = useState({
+    totalClicks: 0,
+    uniqueVisitors: 0,
+    mobileTraffic: 0,
+    desktopTraffic: 0,
+  });
+console.log("USER ID:", user.id);
+
+  useEffect(() => {
+    // Overview
+    fetch(`/api/analytics/overview/${user.id}`)
+      .then(res => res.json())
+      .then(data => {
+        setStats(prev => ({
+          ...prev,
+          totalClicks: data.totalClicks,
+          uniqueVisitors: data.uniqueVisitors || 0,
+        }));
+      });
+
+    // Weekly / Monthly chart
+    fetch(`/api/analytics/clicks-per-day/${user.id}`)
+      .then(res => res.json())
+      .then(data => {
+        const formatted = data.map((d: any) => ({
+          date: d._id,
+          clicks: d.clicks,
+        }));
+        setWeeklyData(formatted);
+        setMonthlyData(formatted);
+      });
+
+    // Devices
+    fetch(`/api/analytics/devices/${user.id}`)
+      .then(res => res.json())
+      .then(data => {
+        const formatted = data.map((d: any) => ({
+          date: d._id,
+          clicks: d.count,
+        }));
+        setDeviceData(formatted);
+
+        const mobile = data.find((d: any) => d._id === 'mobile')?.count || 0;
+        const desktop = data.find((d: any) => d._id === 'desktop')?.count || 0;
+        const total = mobile + desktop || 1;
+
+        setStats(prev => ({
+          ...prev,
+          mobileTraffic: Math.round((mobile / total) * 100),
+          desktopTraffic: Math.round((desktop / total) * 100),
+        }));
+      });
+
+    // Browsers
+    fetch(`/api/analytics/browsers/${user.id}`)
+      .then(res => res.json())
+      .then(data => {
+        const formatted = data.map((d: any) => ({
+          date: d._id,
+          clicks: d.count,
+        }));
+        setBrowserData(formatted);
+      });
+
+    // Countries
+    fetch(`/api/analytics/countries/${user.id}`)
+      .then(res => res.json())
+      .then(setCountryData);
+
+    // Referrers
+    fetch(`/api/analytics/referrers/${user.id}`)
+      .then(res => res.json())
+      .then(setReferrerData);
+
+  }, [user.id]);
 
   const getChartData = () => {
     switch (timeRange) {
@@ -94,29 +140,29 @@ const Analytics: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatsCard
           title="Total Clicks"
-          value={12847}
-          change={23}
+          value={stats.totalClicks}
+          change={0}
           icon={ArrowUp}
           variant="primary"
         />
         <StatsCard
           title="Unique Visitors"
-          value={8423}
-          change={15}
+          value={stats.uniqueVisitors}
+          change={0}
           icon={Globe}
           variant="accent"
         />
         <StatsCard
           title="Mobile Traffic"
-          value="45%"
-          change={8}
+          value={`${stats.mobileTraffic}%`}
+          change={0}
           icon={Smartphone}
           variant="success"
         />
         <StatsCard
           title="Desktop Traffic"
-          value="40%"
-          change={-3}
+          value={`${stats.desktopTraffic}%`}
+          change={0}
           icon={Monitor}
           variant="warning"
         />
@@ -195,19 +241,12 @@ const Analytics: React.FC = () => {
       >
         <h3 className="text-lg font-semibold mb-4">Top Referrers</h3>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[
-            { source: 'Direct', clicks: 4521, change: 12 },
-            { source: 'Twitter/X', clicks: 2341, change: 23 },
-            { source: 'Facebook', clicks: 1876, change: -5 },
-            { source: 'LinkedIn', clicks: 987, change: 8 },
-          ].map((referrer) => (
+          {referrerData.map((referrer) => (
             <div key={referrer.source} className="p-4 bg-muted/50 rounded-lg">
               <p className="text-sm text-muted-foreground">{referrer.source}</p>
               <div className="flex items-center gap-2 mt-1">
-                <span className="text-xl font-bold">{referrer.clicks.toLocaleString()}</span>
-                <span className={`text-xs flex items-center ${referrer.change > 0 ? 'text-success' : 'text-destructive'}`}>
-                  {referrer.change > 0 ? <ArrowUp className="w-3 h-3" /> : <ArrowDown className="w-3 h-3" />}
-                  {Math.abs(referrer.change)}%
+                <span className="text-xl font-bold">
+                  {referrer.clicks.toLocaleString()}
                 </span>
               </div>
             </div>

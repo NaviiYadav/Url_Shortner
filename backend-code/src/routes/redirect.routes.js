@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { redirectToOriginal, getUrlInfo } from '../controllers/redirect.controller.js';
 
+
 const router = Router();
 
 // Get URL info without redirecting

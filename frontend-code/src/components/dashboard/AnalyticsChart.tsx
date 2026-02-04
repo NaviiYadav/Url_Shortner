@@ -92,6 +92,7 @@ const AnalyticsChart: React.FC<AnalyticsChartProps> = ({
                 fill="hsl(var(--primary))"
                 paddingAngle={5}
                 dataKey={dataKey}
+                nameKey="date"  
               >
                 {data.map((_, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
